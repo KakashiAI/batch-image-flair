@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, X, Image as ImageIcon } from 'lucide-react';
+import { Upload, X, Image as ImageIcon, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 
@@ -47,6 +47,23 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ onImagesChange, images
     onImagesChange([]);
   };
 
+  const downloadCSVTemplate = () => {
+    const csvContent = [
+      'current_name,new_name',
+      ...images.map(img => `${img.file.name},`)
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'image_renaming_template.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-4">
       <div
@@ -83,14 +100,25 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({ onImagesChange, images
               <ImageIcon className="h-5 w-5" />
               Uploaded Images ({images.length})
             </h3>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={clearAllImages}
-              className="text-destructive hover:text-destructive"
-            >
-              Clear All
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                onClick={downloadCSVTemplate}
+                className="flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Download CSV Template
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={clearAllImages}
+                className="text-destructive hover:text-destructive"
+              >
+                Clear All
+              </Button>
+            </div>
           </div>
           
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">

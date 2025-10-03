@@ -20,44 +20,65 @@ export const CSVUpload: React.FC<CSVUploadProps> = ({ onMappingChange, mapping }
   const [csvFile, setCsvFile] = useState<File | null>(null);
 
   const parseCSV = (text: string): CSVMapping[] => {
-    const lines = text.split('\n').filter(line => line.trim());
+    // Remove BOM if present and split lines (handle CRLF)
+    const content = text.replace(/^\uFEFF/, '');
+    const lines = content.split(/\r?\n/).filter((line) => line.trim());
     if (lines.length < 2) {
       throw new Error('CSV must have at least a header row and one data row');
     }
 
-    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-    
-    // Find columns for current and new names (flexible column detection)
-    const currentNameIndex = headers.findIndex(h => 
-      h.includes('current') || h.includes('old') || h.includes('original') || h === 'from'
-    );
-    const newNameIndex = headers.findIndex(h => 
-      h.includes('new') || h.includes('rename') || h.includes('target') || h === 'to'
-    );
-
-    if (currentNameIndex === -1 || newNameIndex === -1) {
-      // Fallback: use first two columns
-      if (headers.length < 2) {
-        throw new Error('CSV must have at least 2 columns');
+    // Detect common delimiters: comma, semicolon (Excel locales), tab, pipe
+    const possibleDelimiters = [',', ';', '\t', '|'];
+    const headerLine = lines[0];
+    let delimiter = ',';
+    let maxCount = -1;
+    for (const d of possibleDelimiters) {
+      const re = new RegExp(`\\${d}`, 'g');
+      const count = (headerLine.match(re) || []).length;
+      if (count > maxCount) {
+        maxCount = count;
+        delimiter = d;
       }
-      console.warn('Using first two columns as current and new names');
     }
+
+    const split = (line: string) => line.split(delimiter).map((h) => h.trim());
+
+    const headers = split(headerLine).map((h) => h.replace(/['"]/g, '').trim().toLowerCase());
+
+    if (headers.length < 2) {
+      throw new Error('CSV must have at least 2 columns');
+    }
+
+    // Find columns for current and new names (flexible column detection)
+    const currentNameIndex = headers.findIndex(
+      (h) => h.includes('current') || h.includes('old') || h.includes('original') || h === 'from' || h.includes('source')
+    );
+    const newNameIndex = headers.findIndex(
+      (h) => h.includes('new') || h.includes('rename') || h.includes('target') || h === 'to' || h.includes('dest')
+    );
 
     const useCurrentIndex = currentNameIndex !== -1 ? currentNameIndex : 0;
     const useNewIndex = newNameIndex !== -1 ? newNameIndex : 1;
 
     const mappings: CSVMapping[] = [];
-    
+
     for (let i = 1; i < lines.length; i++) {
-      const columns = lines[i].split(',').map(col => col.trim());
-      if (columns.length >= 2) {
-        const currentName = columns[useCurrentIndex]?.replace(/['"]/g, '') || '';
-        const newName = columns[useNewIndex]?.replace(/['"]/g, '') || '';
-        
+      const columns = split(lines[i]);
+      const neededLen = Math.max(useCurrentIndex, useNewIndex) + 1;
+      if (columns.length >= neededLen) {
+        const currentName = columns[useCurrentIndex]?.replace(/['"]/g, '').trim() || '';
+        const newName = columns[useNewIndex]?.replace(/['"]/g, '').trim() || '';
+
         if (currentName && newName) {
           mappings.push({ currentName, newName });
         }
       }
+    }
+
+    if (mappings.length === 0) {
+      throw new Error(
+        'No valid mappings found. Ensure the CSV uses comma, semicolon, or tab as separators and includes both current and new names.'
+      );
     }
 
     return mappings;

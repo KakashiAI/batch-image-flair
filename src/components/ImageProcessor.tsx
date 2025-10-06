@@ -42,8 +42,26 @@ export const ImageProcessor: React.FC<ImageProcessorProps> = ({ images, mapping 
 
     const processed: ProcessedImage[] = [];
 
-    for (let i = 0; i < images.length; i++) {
-      const image = images[i];
+    // Filter images to only include those with a mapping
+    const imagesToProcess = images.filter(image => {
+      const originalFileName = image.file.name;
+      const fileNameWithoutExt = originalFileName.replace(/\.[^/.]+$/, "");
+      
+      return mapping.some(m => 
+        m.currentName === originalFileName || 
+        m.currentName === fileNameWithoutExt ||
+        originalFileName.includes(m.currentName) ||
+        fileNameWithoutExt.includes(m.currentName)
+      );
+    });
+
+    if (imagesToProcess.length === 0) {
+      setIsProcessing(false);
+      return;
+    }
+
+    for (let i = 0; i < imagesToProcess.length; i++) {
+      const image = imagesToProcess[i];
       const originalFileName = image.file.name;
       const fileNameWithoutExt = originalFileName.replace(/\.[^/.]+$/, "");
       
@@ -91,7 +109,7 @@ export const ImageProcessor: React.FC<ImageProcessorProps> = ({ images, mapping 
         // Convert canvas to blob
         const blob = await new Promise<Blob>((resolve, reject) => {
           canvas.toBlob(
-            (blob) => blob ? resolve(blob) : reject(new Error('Failed to create blob')),
+            (blob) => blob ? resolve(blob) : reject(new Error('Failed to blob')),
             `image/${originalExt === 'jpg' ? 'jpeg' : originalExt}`,
             0.9
           );
@@ -105,7 +123,7 @@ export const ImageProcessor: React.FC<ImageProcessorProps> = ({ images, mapping 
       }
 
       processed.push(processedImage);
-      setProgress(((i + 1) / images.length) * 100);
+      setProgress(((i + 1) / imagesToProcess.length) * 100);
       setProcessedImages([...processed]);
 
       // Small delay to show progress
